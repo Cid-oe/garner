@@ -1,2 +1,7 @@
 node_modules/
-.garner.lock.json
+__pycache__/
+target/
+runs/
+out/
+# Only real Bob sessions are evidence; never commit fixture-mode transcripts.
+bob_sessions/*-fixture.*

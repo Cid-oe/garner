@@ -1,0 +1,28 @@
+[
+  {
+    "id": "Q1-rounding",
+    "quirk": "Banker's rounding (HALF_EVEN) on line totals and tax",
+    "replacements": [["BigDecimal.ROUND_HALF_EVEN", "BigDecimal.ROUND_HALF_UP"]]
+  },
+  {
+    "id": "Q2-volume-boundary",
+    "quirk": "Volume discount starts above 10 units, not at 10 (despite the javadoc)",
+    "replacements": [["if (quantity > 10) {", "if (quantity >= 10) {"]]
+  },
+  {
+    "id": "Q3-case-insensitive-type",
+    "quirk": "Customer types are trimmed and case-insensitive",
+    "replacements": [
+      ["t.equalsIgnoreCase(TYPE_WHOLESALE)", "t.equals(TYPE_WHOLESALE)"],
+      ["t.equalsIgnoreCase(TYPE_STAFF)", "t.equals(TYPE_STAFF)"]
+    ]
+  },
+  {
+    "id": "Q4-weekend-rollover",
+    "quirk": "Due dates on a weekend roll forward to Monday",
+    "replacements": [
+      ["cal.add(Calendar.DAY_OF_MONTH, 2);", ";"],
+      ["cal.add(Calendar.DAY_OF_MONTH, 1);", ";"]
+    ]
+  }
+]

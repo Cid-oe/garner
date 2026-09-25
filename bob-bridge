@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Legacy Bridge CLI. Usage: ./bob-bridge demo | generate-tests | modernize --goal "..." | report
+cd "$(dirname "$0")/harness" && exec python3 -m bridge.cli "$@"
