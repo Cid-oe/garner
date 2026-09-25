@@ -51,3 +51,41 @@ Rules:
 {source}
 ```
 """
+
+REPAIR = """The characterization suite blocked your modernization: it changed behaviour that finance
+depends on. Keep the modern style, but restore the exact original behaviour so every test passes.
+Do not change the tests. Keep the class name, package and public method signatures.
+Reply with the complete corrected `InvoiceCalculator` in a single ```java code block.
+
+Failing tests:
+{failures}
+
+Your modernized version:
+```java
+{candidate}
+```
+
+The original legacy code (the behaviour to preserve):
+```java
+{source}
+```
+"""
+
+HARDEN = """Your characterization suite let some behaviour changes slip through. Each change below
+alters one behaviour of the original code, yet all your tests still passed. Add tests that pin
+down the ORIGINAL behaviour so each of these changes would fail. Keep every existing test.
+Reply with the complete `{test_class}` in one ```java block.
+
+Changes your suite missed:
+{survivors}
+
+Your current test class:
+```java
+{tests}
+```
+
+The original code:
+```java
+{source}
+```
+"""

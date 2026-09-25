@@ -70,7 +70,7 @@ def mutation_score(run: Run, suite: dict, label: str):
     return {"killed": sum(r["killed"] for r in results), "total": len(results), "mutants": results}
 
 
-def generate_tests(run: Run, mode=None, max_fix_rounds=1):
+def generate_tests(run: Run, mode=None, max_fix_rounds=1, max_harden_rounds=1):
     """R1: Bob writes a characterization suite that passes on the unmodified legacy file."""
     src = original_source()
     _log("asking Bob for characterization tests")
@@ -98,6 +98,24 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1):
 
     _log("scoring the suite against behaviour mutants")
     bob_score = mutation_score(run, {name: tests}, "bob") if baseline.passed else None
+    first_score = bob_score
+    harden_rounds = 0
+    while bob_score and bob_score["killed"] < bob_score["total"] and harden_rounds < max_harden_rounds:
+        harden_rounds += 1
+        survivors = [m for m in MUTANTS if not next(r for r in bob_score["mutants"] if r["id"] == m["id"])["killed"]]
+        _log(f"{len(survivors)} mutant(s) survived; asking Bob to harden its suite")
+        described = "\n".join(f"- {m['id']}: " + "; ".join(f"`{a}` became `{b}`" for a, b in m["replacements"]) for m in survivors)
+        ex = bob.ask("harden-tests", prompts.HARDEN.format(test_class=name, survivors=described, tests=tests, source=src), mode)
+        run._note_mode(ex)
+        exchanges.append(ex.transcript)
+        hardened = extract_java(ex.response, "class ")
+        check = run_suite(run.dir / "baseline-hardened", src, {class_name(hardened): hardened}, "original")
+        if not check.passed:
+            _log("hardened suite fails on the original; keeping the previous suite")
+            break
+        tests, name, baseline = hardened, class_name(hardened), check
+        (run.dir / f"{name}.java").write_text(tests, encoding="utf-8")
+        bob_score = mutation_score(run, {name: tests}, f"bob-h{harden_rounds}")
     control_score = mutation_score(run, control_tests(), "control")
 
     run.state["characterization"] = {
@@ -106,6 +124,8 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1):
         "baseline": asdict(baseline),
         "fix_rounds": rounds,
         "mutation": bob_score,
+        "mutation_before_hardening": first_score if harden_rounds else None,
+        "harden_rounds": harden_rounds,
         "control_mutation": control_score,
         "transcripts": exchanges,
     }
@@ -113,7 +133,7 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1):
     return run.state["characterization"]
 
 
-def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=True):
+def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=True, repair=True):
     """R2/R3: Bob modernizes the file; the change is applied only if the characterization suite still passes."""
     char = run.state.get("characterization")
     if not char or not char["baseline"]["compiled"] or char["baseline"]["failures"] or char["baseline"]["errors"]:
@@ -155,6 +175,32 @@ def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=Tru
         "result": asdict(result), "control": asdict(control), "diff": diff,
         "transcript": ex.transcript,
     }
+
+    if verdict == "BLOCKED" and repair:
+        _log("blocked; sending the failing tests back to Bob to repair")
+        failures = "\n".join(f"- {f['name']}: {f['message']}" for f in result.failed) or result.log_tail[-1500:]
+        rex = bob.ask(f"{step}-repair", prompts.REPAIR.format(failures=failures, candidate=candidate, source=src), mode)
+        run._note_mode(rex)
+        try:
+            fixed = extract_java(rex.response, "class InvoiceCalculator")
+        except ValueError as e:
+            record["repair"] = {"verdict": "NOT ATTEMPTED", "reason": str(e), "transcript": rex.transcript}
+        else:
+            (attempt_dir / "InvoiceCalculator.repaired.java").write_text(fixed, encoding="utf-8")
+            again = run_suite(attempt_dir / "work-repaired", fixed, tests, "repaired")
+            r_verdict = "VERIFIED" if again.passed else "BLOCKED"
+            r_applied = None
+            if r_verdict == "VERIFIED" and apply:
+                OUT.mkdir(exist_ok=True)
+                (OUT / "InvoiceCalculator.java").write_text(fixed, encoding="utf-8")
+                r_applied = str((OUT / "InvoiceCalculator.java").relative_to(ROOT))
+            record["repair"] = {
+                "verdict": r_verdict, "applied_to": r_applied, "result": asdict(again),
+                "diff": "".join(difflib.unified_diff(candidate.splitlines(True), fixed.splitlines(True),
+                                                     "bob/blocked.java", "bob/repaired.java")),
+                "transcript": rex.transcript,
+            }
+            _log(f"repair verdict: {r_verdict}" + (f" -> applied to {r_applied}" if r_applied else ""))
     run.state["modernizations"].append(record)
     run.save()
     return record

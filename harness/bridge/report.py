@@ -62,12 +62,16 @@ def render(state) -> str:
 <div class="card stat"><b>{base.get('tests', 0)}</b><span>characterization tests written by Bob</span></div>
 <div class="card stat"><b>{'pass' if base.get('compiled') and not base.get('failures') and not base.get('errors') else 'fail'}</b><span>on the untouched legacy code</span></div>
 <div class="card stat"><b>{f"{mut['killed']}/{mut['total']}" if mut else 'n/a'}</b><span>behaviour mutants caught (hand-written controls: {f"{ctrl['killed']}/{ctrl['total']}" if ctrl else 'n/a'})</span></div>
-<div class="card stat"><b>{sum(m['verdict'] == 'VERIFIED' for m in mods)} / {sum(m['verdict'] == 'BLOCKED' for m in mods)}</b><span>modernizations verified / blocked</span></div>
+<div class="card stat"><b>{sum(m['verdict'] == 'BLOCKED' for m in mods)}</b><span>regressions blocked ({sum((m.get('repair') or {}).get('verdict') == 'VERIFIED' for m in mods)} repaired by Bob and verified)</span></div>
 </div>"""
 
     char_html = ""
     if char:
         fixes = f" Bob corrected its own suite in {char['fix_rounds']} round(s) after it failed on the original." if char.get("fix_rounds") else ""
+        before = char.get("mutation_before_hardening")
+        if before and mut:
+            fixes += (f" <b>Bob hardened its suite:</b> its first version caught {before['killed']}/{before['total']} mutants; "
+                      f"after seeing what slipped through, it caught {mut['killed']}/{mut['total']}.")
         links = " ".join(f'<a href="../../{_e(t)}">{_e(t.split("/")[-1])}</a>' for t in char.get("transcripts", []))
         char_html = f"""<h2>1. Characterization tests</h2><div class="card">
 <p>Bob read the legacy file and wrote <code>{_e(char['test_class'])}</code> to pin down what it does today.{fixes}
@@ -92,6 +96,21 @@ Each mutant below breaks one known legacy quirk; a good safety net must catch ev
 <details><summary>Diff (legacy → Bob)</summary><pre>{_diff_html(m['diff'])}</pre></details>"""
         else:
             body = f"<p>{_e(m.get('reason', ''))}</p>"
+        rep = m.get("repair")
+        if rep:
+            rv = rep["verdict"]
+            if "result" in rep:
+                rr = rep["result"]
+                rstatus = (f"{rr['tests'] - rr['failures'] - rr['errors']}/{rr['tests']} tests pass" if rr["compiled"] else "does not compile")
+                rout = f"Applied to <code>{_e(rep['applied_to'])}</code>." if rep.get("applied_to") else "Not applied."
+                body += f"""<h3 style="margin-top:18px">Bob repairs it: <span class="badge {'NOT' if rv == 'NOT ATTEMPTED' else rv}">{_e(rv)}</span></h3>
+<p>The failing tests went back to Bob. <b>{rstatus}.</b> {rout}</p>
+<details><summary>Diff (blocked → repaired)</summary><pre>{_diff_html(rep['diff'])}</pre></details>
+<p class="sub">Transcript: <a href="../../{_e(rep['transcript'])}">{_e(rep['transcript'].split('/')[-1])}</a></p>"""
+            else:
+                body += f"<p>Repair not attempted: {_e(rep.get('reason', ''))}</p>"
+            if rv == "VERIFIED":
+                v, cls = "BLOCKED → REPAIRED", "VERIFIED"
         mod_html += f"""<h2>{i}. Modernization: <span class="badge {cls}">{_e(v)}</span></h2><div class="card">
 <p><b>Request:</b> {_e(m['goal'])}</p>{body}
 <p class="sub">Transcript: <a href="../../{_e(m['transcript'])}">{_e(m['transcript'].split('/')[-1])}</a></p></div>"""

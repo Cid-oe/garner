@@ -7,6 +7,10 @@ has Bob pin down today's behaviour in a characterization-test suite first, then 
 A change ships only if every characterization test still passes. When a "cleanup" silently changes
 behaviour, the suite catches it and the change is blocked, with the exact difference in the report.
 
+Bob also closes both loops itself: if its tests miss a behaviour mutant, Bob sees what slipped
+through and hardens the suite; if a modernization is blocked, Bob gets the failing tests and
+repairs its own code until the suite passes.
+
 ```
 legacy file ──> Bob writes characterization tests ──> pass on the legacy code? ──> scored against behaviour mutants
                                                                       │
