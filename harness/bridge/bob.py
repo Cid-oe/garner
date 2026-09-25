@@ -13,6 +13,8 @@ Modes:
 
 import json
 import os
+import re
+import shutil
 import shlex
 import subprocess
 import tempfile
@@ -64,30 +66,36 @@ def _record(ex: Exchange) -> Exchange:
     return ex
 
 
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
 def _run_cli(prompt: str, timeout: int) -> tuple[str, str]:
+    """Runs $BOB_CMD. Placeholders: {prompt} (prompt as one argument, e.g. BOB_CMD='bob -p {prompt}'),
+    {prompt_file} (path to a file holding the prompt). With neither, the prompt goes to stdin.
+    Bob runs in an empty scratch directory so, as an agent, it cannot edit the repo."""
     template = os.environ.get("BOB_CMD")
     if not template:
-        raise BobError("BOB_CMD is not set; e.g. export BOB_CMD='bob -p' (see README, Phase 1)")
-    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+        raise BobError("BOB_CMD is not set; e.g. export BOB_CMD='bob -p {prompt}' (see README)")
+    workdir = tempfile.mkdtemp(prefix="bob-bridge-")
+    prompt_file = os.path.join(workdir, "PROMPT.md")
+    with open(prompt_file, "w", encoding="utf-8") as f:
         f.write(prompt)
-        prompt_file = f.name
+    parts = shlex.split(template)
+    stdin = None if any("{prompt" in p for p in parts) else prompt
+    cmd = [p.replace("{prompt_file}", prompt_file) if "{prompt_file}" in p
+           else (prompt if p == "{prompt}" else p) for p in parts]
+    shown = " ".join("<prompt>" if c == prompt else c for c in cmd)
     try:
-        uses_file = "{prompt_file}" in template
-        cmd = shlex.split(template.replace("{prompt_file}", prompt_file))
-        proc = subprocess.run(
-            cmd,
-            input=None if uses_file else prompt,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        proc = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=timeout, cwd=workdir)
     except subprocess.TimeoutExpired as e:
         raise BobError(f"Bob timed out after {timeout}s") from e
+    except FileNotFoundError as e:
+        raise BobError(f"cannot run '{cmd[0]}': not found on PATH") from e
     finally:
-        os.unlink(prompt_file)
+        shutil.rmtree(workdir, ignore_errors=True)
     if proc.returncode != 0:
-        raise BobError(f"Bob exited {proc.returncode}: {proc.stderr.strip()[-500:]}")
-    return proc.stdout, " ".join(cmd)
+        raise BobError(f"Bob exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()[-800:]}")
+    return ANSI.sub("", proc.stdout), shown
 
 
 def _run_replay(step: str) -> tuple[str, str]:
