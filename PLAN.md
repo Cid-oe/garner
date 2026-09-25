@@ -97,6 +97,18 @@ task + repo --> Garner (rank + policy) --> ECC install plan (--skills ... --targ
 - **Reproducibility (premortem risk 7)**: judges can clone ECC; no private library needed. The 6,320-item
   library stays as the "long tail" to show scale (320K tokens).
 
+### Progress
+
+- **Bob target for ECC: done** on `Cid-oe/ECC` branch `feat/ibm-bob-target`. `install.sh --target bob`
+  installs skills to `.bob/skills/`, flat rules to `.bob/rules/`, commands to `.bob/commands/`; agents
+  are excluded. Adapter test added; the target-related test files pass. The full suite has 28 failures:
+  most fail identically on untouched upstream, `control-pane` passes when run alone, and the two
+  `harness-capabilities` failures (hard-coded tool counts) were fixed in the same commit.
+  Upstream PR not opened yet.
+- **Pitch evidence:** in ECC, `--skills tdd-workflow` installs **48 skills**, because the skill ships
+  inside the `workflow-quality` module. Asking for one skill gets you 48. That is Garner's problem
+  statement, measured on a popular project.
+
 ### Measured so far (keyword ranker on ECC)
 
 - Works: "security review before release" picks `security-review` + `security-reviewer`.
@@ -123,7 +135,7 @@ ECC has strong Java/Spring/security/TDD content but no COBOL. Two options:
 
 1. **Granite rerank** (2h): `--rerank watsonx` sends task + top 30 candidates to Granite, keeps the order it
    returns; falls back to keyword ranking when no API key. Done when the two misses above disappear.
-2. **Bob target for ECC** (2h, timeboxed): fork ECC, add `bob-project` target, `install-plan.js --target bob`
+2. ~~**Bob target for ECC**~~ done;: fork ECC, add `bob-project` target, `install-plan.js --target bob`
    dry-runs clean. Done when a Garner pick installs into `.bob/` through ECC.
 3. **Demo repo** (2h): small COBOL payroll program + expected Java behaviour tests; run the golden path end
    to end in Bob the first hour Bob access works.
