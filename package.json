@@ -1,0 +1,12 @@
+{
+  "name": "garner",
+  "version": "0.1.0",
+  "description": "Give your coding agent the right few skills, not all of them. Picks and installs skills and subagents for IBM Bob and Claude Code.",
+  "type": "module",
+  "bin": { "garner": "src/cli.js" },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
