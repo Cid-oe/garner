@@ -1,7 +1,8 @@
 const STOP = new Set(
   ('a an and are as at be by can do for from has have how i in into is it its me my of on or our so that the their them then this to ' +
     'use used uses using want we when which will with you your any all also about add make need needs should via etc e g ie ' +
-    'skill skills agent agents specialist expert help helps task tasks work working code').split(' '),
+    'skill skills agent agents specialist expert help helps task tasks work working code ' +
+    'before after then than some more new get set up out just like want wants please thing things way sure').split(' '),
 );
 
 // Small domain synonym map so "auth" finds "authentication", "k8s" finds "kubernetes", etc.

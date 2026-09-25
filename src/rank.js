@@ -12,6 +12,7 @@ const PLATFORMS = new Set(
     'snowflake unity unreal godot roblox minecraft telegram whatsapp').split(' '),
 );
 const PLATFORM_PENALTY = 0.4;
+const NAME_BONUS = 2;
 
 // Field weights: a hit in the name counts more than one in the body excerpt.
 function docTokens(item) {
@@ -25,8 +26,9 @@ export function createRanker(items) {
     const toks = docTokens(item);
     const tf = new Map();
     for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
-    const platforms = tokenize(item.name.replace(/[-_]/g, ' ')).filter((t) => PLATFORMS.has(t));
-    return { item, tf, len: toks.length, set: new Set(toks), platforms };
+    const nameToks = [...new Set(tokenize(item.name.replace(/[-_]/g, ' ')))];
+    const platforms = nameToks.filter((t) => PLATFORMS.has(t));
+    return { item, tf, len: toks.length, set: new Set(toks), platforms, nameToks };
   });
   const df = new Map();
   for (const d of docs) for (const t of d.set) df.set(t, (df.get(t) || 0) + 1);
@@ -54,6 +56,7 @@ export function createRanker(items) {
     add(expanded, 0.5);
     add(primary, 1);
     const mentioned = new Set([...primary, ...repo]);
+    const primarySet = new Set(primary);
     // Terms from the task itself (not just the repo's stack) drive coverage.
     const taskTerms = new Set([...primary, ...expanded]);
 
@@ -61,6 +64,13 @@ export function createRanker(items) {
     for (const d of docs) {
       const contrib = contributions(d, weighted);
       if (!contrib.size) continue;
+      // Items whose name is mostly made of task words ("security-review" for a
+      // security review) are what the user meant, even when the words are common.
+      const hits = d.nameToks.filter((t) => primarySet.has(t));
+      if (hits.length) {
+        const share = hits.length / d.nameToks.length;
+        for (const t of hits) contrib.set(t, contrib.get(t) + NAME_BONUS * share * idf(t));
+      }
       const factor = d.platforms.some((p) => !mentioned.has(p)) ? PLATFORM_PENALTY : 1;
       if (factor !== 1) for (const [t, v] of contrib) contrib.set(t, v * factor);
       let score = 0;

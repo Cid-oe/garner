@@ -61,11 +61,72 @@ It is Sept 28. We were not shortlisted. Why?
 ## Golden path (demo)
 
 ```bash
-garner index --lib ./skill-library
+garner index --lib ./ECC --lib ./skill-library   # ECC = curated core, second = long tail
 garner pick "modernize PAYROLL.cbl to Java with tests" --repo ./payroll-demo
 garner install "modernize PAYROLL.cbl to Java with tests" --repo ./payroll-demo --target bob
 # In Bob: run the same task; the installed squad does the work
 ```
+
+## ECC integration
+
+[affaan-m/ECC](https://github.com/affaan-m/ECC) (MIT, v2.2.2) is a trending "agent harness OS": 292 skills,
+68 agents, 94 commands, 122 rules, and an installer with adapters for about 15 tools (Claude, Cursor, Codex,
+Kiro, Qwen, Zed, Antigravity...). **It has no IBM Bob support.** Its selective install already takes
+`--skills a,b,c --target <tool>`, but the user has to know which skills to name.
+
+**The combined story: ECC is the library and the installer; Garner is the brain that picks.**
+
+```
+task + repo --> Garner (rank + policy) --> ECC install plan (--skills ... --target bob) --> .bob/
+```
+
+### What we build
+
+| # | Piece | Where | Size |
+|---|---|---|---|
+| 1 | `bob-project` install target (`.bob/skills`, `.bob/rules`) | fork of ECC | ~10 lines + registry + module targets |
+| 2 | Garner indexes ECC as the default curated library | garner | done (works unchanged: 292 skills, 68 agents) |
+| 3 | `garner install --via ecc`: hand the pick to ECC's `install-plan.js`/`install-apply.js` | garner | small |
+| 4 | Granite rerank on watsonx.ai over the top 30 candidates | garner | medium |
+| 5 | Upstream PR "Add IBM Bob target" to ECC | GitHub | small; a strong line for judges |
+
+### Why this helps the scores
+
+- **Application of technology**: ECC + Bob target means ECC's whole catalogue works in Bob, not just ours.
+- **Business value**: rides an existing, popular project; a merged upstream PR is proof of adoption.
+- **Reproducibility (premortem risk 7)**: judges can clone ECC; no private library needed. The 6,320-item
+  library stays as the "long tail" to show scale (320K tokens).
+
+### Measured so far (keyword ranker on ECC)
+
+- Works: "security review before release" picks `security-review` + `security-reviewer`.
+- Misses: "profile it" pulls `linkedin-profile-optimizer`; "OAuth" pulls `x-api`. Word sense needs the
+  Granite rerank (step 4). This moves the rerank from Should to **Must**.
+
+### Premortem additions
+
+| # | Cause | L | I | LxI | Prevention |
+|---|---|---|---|---|---|
+| 9 | ECC's installer is complex (441-line helpers, install state) and eats the day | 3 | 4 | 12 | Timebox ECC target to 2h; fall back to Garner's own installer, keep ECC as library only |
+| 10 | Upstream PR not merged in 48h | 4 | 2 | 8 | Present it as "PR opened"; never depend on merge |
+| 11 | ECC agents use Claude tool names that Bob ignores or rejects | 3 | 3 | 9 | Test one ECC agent in Bob in the first access hour |
+| 12 | Demo drifts: two libraries, two installers, one pitch | 3 | 4 | 12 | One sentence pitch stays Garner; ECC appears as "works with ECC" |
+
+### Demo decision
+
+ECC has strong Java/Spring/security/TDD content but no COBOL. Two options:
+- **A (recommended):** index ECC + the long-tail library together; modernization demo uses ECC's Java/TDD
+  skills plus the long tail's `cobol-engineer` / `legacy-analyst`.
+- **B:** switch the demo to "security review + tests before release" on ECC only. Simpler, less IBM-flavoured.
+
+## Next 3 tasks
+
+1. **Granite rerank** (2h): `--rerank watsonx` sends task + top 30 candidates to Granite, keeps the order it
+   returns; falls back to keyword ranking when no API key. Done when the two misses above disappear.
+2. **Bob target for ECC** (2h, timeboxed): fork ECC, add `bob-project` target, `install-plan.js --target bob`
+   dry-runs clean. Done when a Garner pick installs into `.bob/` through ECC.
+3. **Demo repo** (2h): small COBOL payroll program + expected Java behaviour tests; run the golden path end
+   to end in Bob the first hour Bob access works.
 
 ## Planning tools in this repo
 
