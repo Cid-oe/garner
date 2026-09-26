@@ -28,15 +28,42 @@ class TestRun:
         return self.compiled and self.tests > 0 and self.failures == 0 and self.errors == 0
 
 
+FENCE_OPEN = re.compile(r"^\s*```\s*(java)?\s*$")
+FENCE_CLOSE = re.compile(r"^\s*```\s*$")
+
+
+def _fenced_blocks(text: str):
+    """Yields the contents of properly opened and closed ``` blocks, line by line.
+    Fences embedded mid-line (e.g. inside a quoted tool-call argument) are ignored."""
+    block = None
+    for line in text.splitlines():
+        if block is None:
+            if FENCE_OPEN.match(line):
+                block = []
+        elif FENCE_OPEN.match(line) and "java" in line:
+            block = []  # an unclosed fence (e.g. a truncated quote) followed by a new ```java block
+        elif FENCE_CLOSE.match(line):
+            yield "\n".join(block)
+            block = None
+        else:
+            block.append(line)
+
+
+def _looks_complete(code: str) -> bool:
+    stripped = code.strip()
+    return stripped.endswith("}") and code.count("{") == code.count("}") and code.count("{") > 0
+
+
 def extract_java(response: str, must_contain: str) -> str:
-    """Returns the largest ```java block containing `must_contain`, or the raw text if it is plain Java."""
-    blocks = re.findall(r"```(?:java)?\s*\n(.*?)```", response, flags=re.S)
-    candidates = [b for b in blocks if must_contain in b]
+    """Returns Bob's final complete Java block containing `must_contain`.
+    Bob's output can hold several fences (e.g. code quoted in a subagent task), so only
+    brace-balanced blocks count and the last one wins: that is Bob's final answer."""
+    candidates = [b for b in _fenced_blocks(response) if must_contain in b and _looks_complete(b)]
     if candidates:
-        return textwrap.dedent(max(candidates, key=len)).strip() + "\n"
-    if must_contain in response and "package " in response:
+        return textwrap.dedent(candidates[-1]).strip() + "\n"
+    if must_contain in response and "package " in response and "```" not in response:
         return response.strip() + "\n"
-    raise ValueError(f"no Java code containing '{must_contain}' in Bob's response")
+    raise ValueError(f"no complete Java code containing '{must_contain}' in Bob's response")
 
 
 def class_name(java: str) -> str:
