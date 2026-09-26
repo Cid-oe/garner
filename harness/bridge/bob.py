@@ -127,7 +127,8 @@ def parse_bob_output(raw: str) -> tuple[str, float | None]:
 
 
 def _run_replay(step: str) -> tuple[str, str]:
-    recorded = sorted(p for p in SESSIONS.glob(f"*-{step}-cli.json"))
+    # Names are <timestamp>Z-<step>-cli.json; anchor on "Z-" so "generate-tests" never matches "metaphone-generate-tests".
+    recorded = sorted(p for p in SESSIONS.glob(f"*Z-{step}-cli.json"))
     if not recorded:
         raise BobError(f"no recorded Bob session for step '{step}' to replay")
     data = json.loads(recorded[-1].read_text(encoding="utf-8"))
