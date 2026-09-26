@@ -5,3 +5,5 @@ runs/
 out/
 # Only real Bob sessions are evidence; never commit fixture-mode transcripts.
 bob_sessions/*-fixture.*
+# Replays re-record existing sessions; only the original cli sessions are evidence.
+bob_sessions/*-replay.*
