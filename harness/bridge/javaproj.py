@@ -1,6 +1,7 @@
 """Builds a candidate source + test suite in an isolated copy of the sample project and runs it."""
 
 import re
+import textwrap
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
@@ -34,7 +35,7 @@ def extract_java(response: str, must_contain: str) -> str:
     blocks = re.findall(r"```(?:java)?\s*\n(.*?)```", response, flags=re.S)
     candidates = [b for b in blocks if must_contain in b]
     if candidates:
-        return max(candidates, key=len).strip() + "\n"
+        return textwrap.dedent(max(candidates, key=len)).strip() + "\n"
     if must_contain in response and "package " in response:
         return response.strip() + "\n"
     raise ValueError(f"no Java code containing '{must_contain}' in Bob's response")

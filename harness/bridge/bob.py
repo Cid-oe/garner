@@ -42,6 +42,8 @@ class Exchange:
     started_at: str
     seconds: float
     transcript: str = ""
+    cost: float | None = None
+    raw: str = ""
 
 
 def _now():
@@ -57,8 +59,10 @@ def _record(ex: Exchange) -> Exchange:
         else "Hand-written fixture for offline development. This is NOT Bob output.\n\n")
     path.write_text(
         f"# Bob session: {ex.step}\n\n{banner}"
-        f"- Started: {ex.started_at}\n- Command: `{ex.command}`\n- Duration: {ex.seconds:.1f}s\n\n"
-        f"## Prompt\n\n````\n{ex.prompt}\n````\n\n## Response\n\n````\n{ex.response}\n````\n",
+        f"- Started: {ex.started_at}\n- Command: `{ex.command}`\n- Duration: {ex.seconds:.1f}s\n"
+        f"- Bob cost: {ex.cost if ex.cost is not None else 'not reported'}\n\n"
+        f"## Prompt\n\n````\n{ex.prompt}\n````\n\n## Bob's answer\n\n````\n{ex.response}\n````\n\n"
+        f"## Raw Bob output\n\n````\n{ex.raw}\n````\n",
         encoding="utf-8",
     )
     (SESSIONS / f"{name}.json").write_text(json.dumps(asdict(ex), indent=2), encoding="utf-8")
@@ -85,8 +89,10 @@ def _run_cli(prompt: str, timeout: int) -> tuple[str, str]:
     cmd = [p.replace("{prompt_file}", prompt_file) if "{prompt_file}" in p
            else (prompt if p == "{prompt}" else p) for p in parts]
     shown = " ".join("<prompt>" if c == prompt else c for c in cmd)
+    # Bob wraps output to the terminal width; ask for wide output so long code lines are not split.
+    env = {**os.environ, "COLUMNS": os.environ.get("BOB_COLUMNS", "400")}
     try:
-        proc = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=timeout, cwd=workdir)
+        proc = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=timeout, cwd=workdir, env=env)
     except subprocess.TimeoutExpired as e:
         raise BobError(f"Bob timed out after {timeout}s") from e
     except FileNotFoundError as e:
@@ -95,7 +101,28 @@ def _run_cli(prompt: str, timeout: int) -> tuple[str, str]:
         shutil.rmtree(workdir, ignore_errors=True)
     if proc.returncode != 0:
         raise BobError(f"Bob exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()[-800:]}")
-    return ANSI.sub("", proc.stdout), shown
+    return proc.stdout, shown
+
+
+ASSISTANT_HEADER = re.compile(r"^Assistant \(\d+\).*$", re.M)
+COST = re.compile(r"Total Cost:\s*([0-9.]+)")
+
+
+def parse_bob_output(raw: str) -> tuple[str, float | None]:
+    """Bob Shell prints a transcript: the echoed prompt ("User (1) ..."), then "Assistant (n) ..."
+    sections, then a "Task Summary". Returns only the assistant text (so code echoed from the prompt
+    is never mistaken for Bob's answer) and the reported cost. Plain output is returned unchanged."""
+    text = "\n".join(line.rstrip() for line in ANSI.sub("", raw).splitlines())
+    m = COST.search(text)
+    cost = float(m.group(1)) if m else None
+    headers = list(ASSISTANT_HEADER.finditer(text))
+    if not headers:
+        return text, cost
+    answer = text[headers[0].end():]
+    answer = answer.split("\nTask Summary", 1)[0]
+    answer = ASSISTANT_HEADER.sub("", answer)
+    answer = "\n".join(l for l in answer.splitlines() if not re.fullmatch(r"\s*[─━-]{20,}\s*", l))
+    return answer.strip() + "\n", cost
 
 
 def _run_replay(step: str) -> tuple[str, str]:
@@ -126,4 +153,6 @@ def ask(step: str, prompt: str, mode: str | None = None, timeout: int = 600) -> 
         response, command = _run_fixture(step)
     else:
         raise BobError(f"unknown mode '{mode}' (cli, replay, fixture)")
-    return _record(Exchange(step, mode, prompt, response, command, started, time.monotonic() - t0))
+    raw = response
+    response, cost = parse_bob_output(raw)
+    return _record(Exchange(step, mode, prompt, response, command, started, time.monotonic() - t0, cost=cost, raw=raw))

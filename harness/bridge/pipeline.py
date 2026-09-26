@@ -46,6 +46,9 @@ class Run:
     def _note_mode(self, ex):
         if ex.mode not in self.state["modes"]:
             self.state["modes"].append(ex.mode)
+        self.state["bob_calls"] = self.state.get("bob_calls", 0) + 1
+        if ex.cost is not None:
+            self.state["bob_cost"] = round(self.state.get("bob_cost", 0) + ex.cost, 3)
 
 
 def original_source():

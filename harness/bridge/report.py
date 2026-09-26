@@ -119,7 +119,7 @@ Each mutant below breaks one known legacy quirk; a good safety net must catch ev
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Legacy Bridge report</title>
 <style>{CSS}</style></head><body><main>
 <h1>Legacy Bridge report</h1>
-<p class="sub">Run {_e(state['id'])} · <code>{_e(state['source_file'])}</code> · Bob modernizes; Bob's own characterization tests decide what ships.</p>
+<p class="sub">Run {_e(state['id'])} · <code>{_e(state['source_file'])}</code> · {state.get('bob_calls', 0)} Bob calls{f" · {state['bob_cost']} Bob coins" if state.get('bob_cost') is not None else ""} · Bob modernizes; Bob's own characterization tests decide what ships.</p>
 {banner}{stats}{char_html}{mod_html}
 </main></body></html>"""
 
