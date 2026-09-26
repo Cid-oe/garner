@@ -55,6 +55,8 @@ def render(state) -> str:
     banner = ""
     if "fixture" in modes:
         banner = '<div class="banner">Fixture mode: responses are hand-written test data, NOT Bob output.</div>'
+    elif "replay" in modes and "cli" in modes:
+        banner = '<div class="banner">Some steps reuse Bob answers recorded earlier in bob_sessions/; the rest are live Bob calls.</div>'
     elif "replay" in modes:
         banner = '<div class="banner">Replay: Bob responses replayed from recorded sessions in bob_sessions/.</div>'
 

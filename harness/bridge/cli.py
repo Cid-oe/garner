@@ -35,7 +35,7 @@ def probe(mode):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="bob-bridge", description="Bob-driven legacy modernization behind a characterization-test gate.")
-    p.add_argument("--mode", choices=["cli", "replay", "fixture"], help="how to reach Bob (default: $BRIDGE_MODE or cli)")
+    p.add_argument("--mode", choices=["cli", "replay", "resume", "fixture"], help="how to reach Bob (default: $BRIDGE_MODE or cli)")
     p.add_argument("--target", help="folder with the code to modernize and its target.json (default: sample)")
     sub = p.add_subparsers(dest="cmd", required=True)
 

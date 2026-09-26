@@ -4,6 +4,7 @@ Modes:
   cli      Runs the command in $BOB_CMD (e.g. Bob Shell in non-interactive mode).
            The prompt goes to stdin, or into a temp file if the command
            contains {prompt_file}. Stdout is the response.
+  resume   Replay for steps that already have a recorded Bob session, live Bob for the rest.
   replay   Returns the response from a previously recorded Bob session with the
            same step name. Used by the hosted demo so judges can click through
            without an API key; the report says it is a replay.
@@ -140,19 +141,28 @@ def _run_fixture(step: str) -> tuple[str, str]:
     return path.read_text(encoding="utf-8"), f"fixture {path.name}"
 
 
-def ask(step: str, prompt: str, mode: str | None = None, timeout: int = 600) -> Exchange:
+def ask(step: str, prompt: str, mode: str | None = None, timeout: int | None = None) -> Exchange:
     """Sends one prompt to Bob and records the exchange. `step` names it (e.g. 'generate-tests')."""
     mode = mode or os.environ.get("BRIDGE_MODE", "cli")
+    timeout = timeout or int(os.environ.get("BOB_TIMEOUT", "1800"))
     started = _now()
     t0 = time.monotonic()
     if mode == "cli":
         response, command = _run_cli(prompt, timeout)
     elif mode == "replay":
         response, command = _run_replay(step)
+    elif mode == "resume":
+        # Reuse Bob's recorded answer for steps already done; ask Bob live for new ones.
+        try:
+            response, command = _run_replay(step)
+            mode = "replay"
+        except BobError:
+            response, command = _run_cli(prompt, timeout)
+            mode = "cli"
     elif mode == "fixture":
         response, command = _run_fixture(step)
     else:
-        raise BobError(f"unknown mode '{mode}' (cli, replay, fixture)")
+        raise BobError(f"unknown mode '{mode}' (cli, replay, resume, fixture)")
     raw = response
     response, cost = parse_bob_output(raw)
     return _record(Exchange(step, mode, prompt, response, command, started, time.monotonic() - t0, cost=cost, raw=raw))
