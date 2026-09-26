@@ -67,6 +67,7 @@ mutants). Pick one with `--target`:
 |---|---|
 | `sample` (default) | Fabricated 2004-era `InvoiceCalculator` with four documented quirks |
 | `targets/metaphone` | **Real open-source code:** `Metaphone` from Apache Commons Codec 1.3 (2005), unmodified, Apache License 2.0 |
+| `targets/base64` | **Real open-source code:** `Base64` from Apache Commons Codec 1.3 (2005), unmodified; its quirks break when swapped for `java.util.Base64` |
 
 ```bash
 ./bob-bridge --target targets/metaphone generate-tests

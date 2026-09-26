@@ -1,0 +1,12 @@
+{
+  "name": "base64",
+  "title": "Base64 from Apache Commons Codec 1.3 (2005, real open-source code)",
+  "source": "src/main/java/org/apache/commons/codec/binary/Base64.java",
+  "package": "org.apache.commons.codec.binary",
+  "class": "Base64",
+  "test_dir": "src/test/java/org/apache/commons/codec/binary",
+  "stakeholder": "systems that exchange Base64 data with this code (email/MIME, stored tokens, file transfers)",
+  "controls": ["Base64ControlTest"],
+  "mutants": "mutants.json",
+  "origin": "https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.3/commons-codec-1.3-sources.jar (Apache License 2.0, unmodified)"
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "id": "B1-discard-non-base64",
+    "quirk": "Decoding silently skips every non-Base64 character (spaces, line breaks, junk) instead of rejecting it",
+    "replacements": [["        base64Data = discardNonBase64(base64Data);\n", ""]]
+  },
+  {
+    "id": "B2-crlf-separator",
+    "quirk": "Chunked output separates lines with CRLF (\\r\\n), not LF",
+    "replacements": [["static final byte[] CHUNK_SEPARATOR = \"\\r\\n\".getBytes();", "static final byte[] CHUNK_SEPARATOR = \"\\n\".getBytes();"]]
+  },
+  {
+    "id": "B3-trailing-separator",
+    "quirk": "Chunked output always ends with a line separator, even for short input",
+    "replacements": [["            if (chunksSoFar < nbrChunks) {", "            if (false && chunksSoFar < nbrChunks) {"]]
+  },
+  {
+    "id": "B4-whitespace-is-valid",
+    "quirk": "isArrayByteBase64 treats whitespace as valid Base64",
+    "replacements": [["        arrayOctect = discardWhitespace(arrayOctect);\n", ""]]
+  },
+  {
+    "id": "B5-76-char-lines",
+    "quirk": "Chunked lines are 76 characters (MIME), not 64 (PEM)",
+    "replacements": [["static final int CHUNK_SIZE = 76;", "static final int CHUNK_SIZE = 64;"]]
+  }
+]
