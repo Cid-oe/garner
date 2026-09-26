@@ -1,0 +1,27 @@
+[
+  {
+    "id": "M1-duplicate-C",
+    "quirk": "Repeated letters are skipped, except C (\"ACCEPT\" keeps both Cs' sounds)",
+    "replacements": [["if ((symb != 'C') && (isPreviousChar( local, n, symb )) ) {", "if (isPreviousChar( local, n, symb )) {"]]
+  },
+  {
+    "id": "M2-single-char-path",
+    "quirk": "A one-letter input is returned upper-cased without running the algorithm (the general path would index past the end)",
+    "replacements": [["        if (txt.length() == 1) {\n            return txt.toUpperCase() ;\n        }", ""]]
+  },
+  {
+    "id": "M3-initial-X",
+    "quirk": "An initial X is pronounced S (\"XAVIER\")",
+    "replacements": [["            inwd[0] = 'S';\n", ""]]
+  },
+  {
+    "id": "M4-WH-to-W",
+    "quirk": "An initial WH becomes W (\"WHITE\")",
+    "replacements": [["                local.setCharAt(0, 'W'); // WH -> W\n", ""]]
+  },
+  {
+    "id": "M5-silent-TCH",
+    "quirk": "The T in TCH is silent (\"MATCH\")",
+    "replacements": [["                    if (regionMatch(local,n,\"TCH\")) {\n\t\t\t\t\t\t// Silent if in \"TCH\"\n                        break;\n                    }\n", ""]]
+  }
+]

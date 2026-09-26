@@ -1,6 +1,7 @@
 """bob-bridge command line."""
 
 import argparse
+import os
 import sys
 
 from . import pipeline, report
@@ -35,6 +36,7 @@ def probe(mode):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="bob-bridge", description="Bob-driven legacy modernization behind a characterization-test gate.")
     p.add_argument("--mode", choices=["cli", "replay", "fixture"], help="how to reach Bob (default: $BRIDGE_MODE or cli)")
+    p.add_argument("--target", help="folder with the code to modernize and its target.json (default: sample)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("probe", help="Phase 1: check Bob answers a scripted prompt with parseable Java, and time it")
@@ -46,6 +48,8 @@ def main(argv=None):
     sub.add_parser("demo", help="full pipeline: tests, a benign modernization, a regression, report")
 
     args = p.parse_args(argv)
+    if args.target:
+        os.environ["BRIDGE_TARGET"] = args.target
     try:
         if args.cmd == "probe":
             return probe(args.mode)

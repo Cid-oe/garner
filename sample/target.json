@@ -1,0 +1,11 @@
+{
+  "name": "invoice",
+  "title": "InvoiceCalculator (fabricated 2004-era billing code)",
+  "source": "src/main/java/com/acme/billing/InvoiceCalculator.java",
+  "package": "com.acme.billing",
+  "class": "InvoiceCalculator",
+  "test_dir": "src/test/java/com/acme/billing",
+  "stakeholder": "finance",
+  "controls": ["ControlQuirksTest"],
+  "mutants": "../harness/mutants.json"
+}

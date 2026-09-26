@@ -1,0 +1,14 @@
+{
+  "name": "metaphone",
+  "title": "Metaphone from Apache Commons Codec 1.3 (2005, real open-source code)",
+  "source": "src/main/java/org/apache/commons/codec/language/Metaphone.java",
+  "package": "org.apache.commons.codec.language",
+  "class": "Metaphone",
+  "test_dir": "src/test/java/org/apache/commons/codec/language",
+  "stakeholder": "search and matching features that store these codes",
+  "controls": [
+    "MetaphoneControlTest"
+  ],
+  "mutants": "mutants.json",
+  "origin": "https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.3/commons-codec-1.3-sources.jar (Apache License 2.0, unmodified)"
+}

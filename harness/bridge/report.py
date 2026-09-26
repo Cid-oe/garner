@@ -61,7 +61,7 @@ def render(state) -> str:
     stats = f"""<div class="stats">
 <div class="card stat"><b>{base.get('tests', 0)}</b><span>characterization tests written by Bob</span></div>
 <div class="card stat"><b>{'pass' if base.get('compiled') and not base.get('failures') and not base.get('errors') else 'fail'}</b><span>on the untouched legacy code</span></div>
-<div class="card stat"><b>{f"{mut['killed']}/{mut['total']}" if mut else 'n/a'}</b><span>behaviour mutants caught (hand-written controls: {f"{ctrl['killed']}/{ctrl['total']}" if ctrl else 'n/a'})</span></div>
+<div class="card stat"><b>{f"{mut['killed']}/{mut['total']}" if mut else 'n/a'}</b><span>behaviour mutants caught{f" (hand-written controls: {ctrl['killed']}/{ctrl['total']})" if ctrl else ""}</span></div>
 <div class="card stat"><b>{sum(m['verdict'] == 'BLOCKED' for m in mods)}</b><span>regressions blocked ({sum((m.get('repair') or {}).get('verdict') == 'VERIFIED' for m in mods)} repaired by Bob and verified)</span></div>
 </div>"""
 
@@ -119,7 +119,7 @@ Each mutant below breaks one known legacy quirk; a good safety net must catch ev
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Legacy Bridge report</title>
 <style>{CSS}</style></head><body><main>
 <h1>Legacy Bridge report</h1>
-<p class="sub">Run {_e(state['id'])} · <code>{_e(state['source_file'])}</code> · {state.get('bob_calls', 0)} Bob calls{f" · {state['bob_cost']} Bob coins" if state.get('bob_cost') is not None else ""} · Bob modernizes; Bob's own characterization tests decide what ships.</p>
+<p class="sub"><b>{_e(state.get('target_title', 'InvoiceCalculator'))}</b><br>Run {_e(state['id'])} · <code>{_e(state['source_file'])}</code> · {state.get('bob_calls', 0)} Bob calls{f" · {state['bob_cost']} Bob coins" if state.get('bob_cost') is not None else ""} · Bob modernizes; Bob's own characterization tests decide what ships.</p>
 {banner}{stats}{char_html}{mod_html}
 </main></body></html>"""
 

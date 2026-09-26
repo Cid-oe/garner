@@ -8,13 +8,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import bob, prompts
-from .javaproj import SAMPLE, SOURCE_REL, TEST_DIR_REL, apply_mutant, class_name, extract_java, run_suite
+from .javaproj import apply_mutant, class_name, extract_java, run_suite
+from .target import current
 
 ROOT = bob.ROOT
 RUNS = ROOT / "runs"
 OUT = ROOT / "out"
-MUTANTS = json.loads((ROOT / "harness" / "mutants.json").read_text(encoding="utf-8"))
-TEST_CLASS = "InvoiceCalculatorCharacterizationTest"
 
 
 def _log(msg):
@@ -30,11 +29,14 @@ class Run:
         self.dir.mkdir(parents=True, exist_ok=True)
         state_file = self.dir / "state.json"
         self.state = json.loads(state_file.read_text()) if state_file.exists() else {
-            "id": self.id, "source_file": str(SOURCE_REL), "modes": [], "characterization": None, "modernizations": []}
+            "id": self.id, "target": current().name, "target_title": current().title,
+            "source_file": str(current().source), "modes": [], "characterization": None, "modernizations": []}
 
     @classmethod
     def latest(cls):
-        runs = sorted(p.name for p in RUNS.glob("*") if (p / "state.json").exists())
+        name = current().name
+        runs = sorted(p.name for p in RUNS.glob("*") if (p / "state.json").exists()
+                      and json.loads((p / "state.json").read_text()).get("target", "invoice") == name)
         if not runs:
             raise SystemExit("no runs yet; run `bob-bridge generate-tests` first")
         return cls(runs[-1])
@@ -52,11 +54,11 @@ class Run:
 
 
 def original_source():
-    return (SAMPLE / SOURCE_REL).read_text(encoding="utf-8")
+    return current().original_source()
 
 
 def control_tests():
-    return {"ControlQuirksTest": (SAMPLE / TEST_DIR_REL / "ControlQuirksTest.java").read_text(encoding="utf-8")}
+    return current().controls()
 
 
 def mutation_score(run: Run, suite: dict, label: str):
@@ -69,15 +71,16 @@ def mutation_score(run: Run, suite: dict, label: str):
                 "by": [f["name"] for f in r.failed][:3], "compiled": r.compiled}
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(one, MUTANTS))
+        results = list(pool.map(one, current().mutants()))
     return {"killed": sum(r["killed"] for r in results), "total": len(results), "mutants": results}
 
 
 def generate_tests(run: Run, mode=None, max_fix_rounds=1, max_harden_rounds=1):
     """R1: Bob writes a characterization suite that passes on the unmodified legacy file."""
+    t = current()
     src = original_source()
     _log("asking Bob for characterization tests")
-    ex = bob.ask("generate-tests", prompts.GENERATE_TESTS.format(test_class=TEST_CLASS, source=src), mode)
+    ex = bob.ask(t.step("generate-tests"), prompts.GENERATE_TESTS.format(test_class=f"{t.cls}CharacterizationTest", source=src, package=t.package, cls=t.cls), mode)
     run._note_mode(ex)
     exchanges = [ex.transcript]
     tests = extract_java(ex.response, "class ")
@@ -89,7 +92,7 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1, max_harden_rounds=1):
         rounds += 1
         _log(f"{baseline.failures + baseline.errors} test(s) fail on the original; asking Bob to fix them")
         failures = "\n".join(f"- {f['name']}: {f['message']}" for f in baseline.failed) or baseline.log_tail[-1500:]
-        ex = bob.ask("fix-tests", prompts.FIX_TESTS.format(test_class=name, failures=failures, tests=tests, source=src), mode)
+        ex = bob.ask(t.step("fix-tests"), prompts.FIX_TESTS.format(test_class=name, failures=failures, tests=tests, source=src), mode)
         run._note_mode(ex)
         exchanges.append(ex.transcript)
         tests = extract_java(ex.response, "class ")
@@ -105,10 +108,10 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1, max_harden_rounds=1):
     harden_rounds = 0
     while bob_score and bob_score["killed"] < bob_score["total"] and harden_rounds < max_harden_rounds:
         harden_rounds += 1
-        survivors = [m for m in MUTANTS if not next(r for r in bob_score["mutants"] if r["id"] == m["id"])["killed"]]
+        survivors = [m for m in current().mutants() if not next(r for r in bob_score["mutants"] if r["id"] == m["id"])["killed"]]
         _log(f"{len(survivors)} mutant(s) survived; asking Bob to harden its suite")
         described = "\n".join(f"- {m['id']}: " + "; ".join(f"`{a}` became `{b}`" for a, b in m["replacements"]) for m in survivors)
-        ex = bob.ask("harden-tests", prompts.HARDEN.format(test_class=name, survivors=described, tests=tests, source=src), mode)
+        ex = bob.ask(t.step("harden-tests"), prompts.HARDEN.format(test_class=name, survivors=described, tests=tests, source=src), mode)
         run._note_mode(ex)
         exchanges.append(ex.transcript)
         hardened = extract_java(ex.response, "class ")
@@ -119,7 +122,7 @@ def generate_tests(run: Run, mode=None, max_fix_rounds=1, max_harden_rounds=1):
         tests, name, baseline = hardened, class_name(hardened), check
         (run.dir / f"{name}.java").write_text(tests, encoding="utf-8")
         bob_score = mutation_score(run, {name: tests}, f"bob-h{harden_rounds}")
-    control_score = mutation_score(run, control_tests(), "control")
+    control_score = mutation_score(run, control_tests(), "control") if control_tests() else None
 
     run.state["characterization"] = {
         "test_class": name,
@@ -141,14 +144,15 @@ def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=Tru
     char = run.state.get("characterization")
     if not char or not char["baseline"]["compiled"] or char["baseline"]["failures"] or char["baseline"]["errors"]:
         raise SystemExit("no passing characterization suite in this run; run generate-tests first")
+    t = current()
     src = original_source()
     tests = {char["test_class"]: (ROOT / char["test_file"]).read_text(encoding="utf-8")}
 
     _log(f"asking Bob to modernize: {goal}")
-    ex = bob.ask(step, prompts.MODERNIZE.format(goal=goal, source=src), mode)
+    ex = bob.ask(t.step(step), prompts.MODERNIZE.format(goal=goal, source=src, cls=t.cls), mode)
     run._note_mode(ex)
     try:
-        candidate = extract_java(ex.response, "class InvoiceCalculator")
+        candidate = extract_java(ex.response, f"class {t.cls}")
     except ValueError as e:
         record = {"step": step, "goal": goal, "verdict": "NOT ATTEMPTED", "reason": str(e), "transcript": ex.transcript}
         run.state["modernizations"].append(record)
@@ -157,7 +161,7 @@ def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=Tru
 
     attempt_dir = run.dir / step
     attempt_dir.mkdir(exist_ok=True)
-    (attempt_dir / "InvoiceCalculator.java").write_text(candidate, encoding="utf-8")
+    (attempt_dir / f"{t.cls}.java").write_text(candidate, encoding="utf-8")
 
     _log("re-running the characterization suite against Bob's version")
     result = run_suite(attempt_dir / "work", candidate, tests, "candidate")
@@ -166,13 +170,13 @@ def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=Tru
 
     applied_to = None
     if verdict == "VERIFIED" and apply:
-        OUT.mkdir(exist_ok=True)
-        (OUT / "InvoiceCalculator.java").write_text(candidate, encoding="utf-8")
-        applied_to = str((OUT / "InvoiceCalculator.java").relative_to(ROOT))
+        (OUT / t.name).mkdir(parents=True, exist_ok=True)
+        (OUT / t.name / f"{t.cls}.java").write_text(candidate, encoding="utf-8")
+        applied_to = str((OUT / t.name / f"{t.cls}.java").relative_to(ROOT))
     _log(f"verdict: {verdict}" + (f" -> applied to {applied_to}" if applied_to else " -> not applied"))
 
     diff = "".join(difflib.unified_diff(src.splitlines(True), candidate.splitlines(True),
-                                        "legacy/InvoiceCalculator.java", "bob/InvoiceCalculator.java"))
+                                        f"legacy/{t.cls}.java", f"bob/{t.cls}.java"))
     record = {
         "step": step, "goal": goal, "verdict": verdict, "applied_to": applied_to,
         "result": asdict(result), "control": asdict(control), "diff": diff,
@@ -182,21 +186,21 @@ def modernize(run: Run, goal: str, step: str = "modernize", mode=None, apply=Tru
     if verdict == "BLOCKED" and repair:
         _log("blocked; sending the failing tests back to Bob to repair")
         failures = "\n".join(f"- {f['name']}: {f['message']}" for f in result.failed) or result.log_tail[-1500:]
-        rex = bob.ask(f"{step}-repair", prompts.REPAIR.format(failures=failures, candidate=candidate, source=src), mode)
+        rex = bob.ask(t.step(f"{step}-repair"), prompts.REPAIR.format(failures=failures, candidate=candidate, source=src, cls=t.cls, stakeholder=t.stakeholder), mode)
         run._note_mode(rex)
         try:
-            fixed = extract_java(rex.response, "class InvoiceCalculator")
+            fixed = extract_java(rex.response, f"class {t.cls}")
         except ValueError as e:
             record["repair"] = {"verdict": "NOT ATTEMPTED", "reason": str(e), "transcript": rex.transcript}
         else:
-            (attempt_dir / "InvoiceCalculator.repaired.java").write_text(fixed, encoding="utf-8")
+            (attempt_dir / f"{t.cls}.repaired.java").write_text(fixed, encoding="utf-8")
             again = run_suite(attempt_dir / "work-repaired", fixed, tests, "repaired")
             r_verdict = "VERIFIED" if again.passed else "BLOCKED"
             r_applied = None
             if r_verdict == "VERIFIED" and apply:
-                OUT.mkdir(exist_ok=True)
-                (OUT / "InvoiceCalculator.java").write_text(fixed, encoding="utf-8")
-                r_applied = str((OUT / "InvoiceCalculator.java").relative_to(ROOT))
+                (OUT / t.name).mkdir(parents=True, exist_ok=True)
+                (OUT / t.name / f"{t.cls}.java").write_text(fixed, encoding="utf-8")
+                r_applied = str((OUT / t.name / f"{t.cls}.java").relative_to(ROOT))
             record["repair"] = {
                 "verdict": r_verdict, "applied_to": r_applied, "result": asdict(again),
                 "diff": "".join(difflib.unified_diff(candidate.splitlines(True), fixed.splitlines(True),

@@ -58,6 +58,20 @@ non-interactive mode. Check it with a one-line prompt first:
 echo "Reply with the word ready" | $BOB_CMD
 ```
 
+## Targets
+
+A target is a Maven project folder with a `target.json` (source file, class, package, control tests,
+mutants). Pick one with `--target`:
+
+| Target | What it is |
+|---|---|
+| `sample` (default) | Fabricated 2004-era `InvoiceCalculator` with four documented quirks |
+| `targets/metaphone` | **Real open-source code:** `Metaphone` from Apache Commons Codec 1.3 (2005), unmodified, Apache License 2.0 |
+
+```bash
+./bob-bridge --target targets/metaphone generate-tests
+```
+
 ## The sample
 
 `sample/` is a fabricated 2004-era invoice calculator with four real quirks, each a trap for a

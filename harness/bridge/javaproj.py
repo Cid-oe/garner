@@ -8,11 +8,9 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .bob import ROOT
+from .bob import ROOT  # noqa: F401
+from .target import current
 
-SAMPLE = ROOT / "sample"
-SOURCE_REL = Path("src/main/java/com/acme/billing/InvoiceCalculator.java")
-TEST_DIR_REL = Path("src/test/java/com/acme/billing")
 
 
 @dataclass
@@ -49,14 +47,15 @@ def class_name(java: str) -> str:
 
 
 def run_suite(workdir: Path, source: str, tests: dict, label: str, timeout: int = 300) -> TestRun:
-    """Copies the sample project to `workdir`, installs `source` and `tests` ({ClassName: code}), runs mvn test."""
+    """Copies the target project to `workdir`, installs `source` and `tests` ({ClassName: code}), runs mvn test."""
+    t = current()
     if workdir.exists():
         shutil.rmtree(workdir)
-    shutil.copytree(SAMPLE, workdir, ignore=shutil.ignore_patterns("target"))
-    test_dir = workdir / TEST_DIR_REL
+    shutil.copytree(t.root, workdir, ignore=shutil.ignore_patterns("target"))
+    test_dir = workdir / t.test_dir
     shutil.rmtree(test_dir, ignore_errors=True)
     test_dir.mkdir(parents=True)
-    (workdir / SOURCE_REL).write_text(source, encoding="utf-8")
+    (workdir / t.source).write_text(source, encoding="utf-8")
     for name, code in tests.items():
         (test_dir / f"{name}.java").write_text(code, encoding="utf-8")
 

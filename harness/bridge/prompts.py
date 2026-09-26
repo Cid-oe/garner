@@ -7,11 +7,11 @@ during modernization makes a test fail. Do not test what the comments say it sho
 what it actually does. Where the code and its javadoc disagree, the code wins.
 
 Requirements:
-- One JUnit 5 test class named `{test_class}` in package `com.acme.billing`.
+- One JUnit 5 test class named `{test_class}` in package `{package}`.
 - Use only JUnit 5 (org.junit.jupiter.api) and the JDK. No other libraries.
-- Call only the public API of `InvoiceCalculator` shown below; keep test inputs deterministic.
-- Cover boundaries (e.g. quantities around discount thresholds), rounding of half-cent values,
-  input normalisation (whitespace, letter case, null), error cases, and date edge cases.
+- Call only the public API of `{cls}` shown below; keep test inputs deterministic.
+- Cover boundaries, special cases and branches, input normalisation (whitespace, letter case,
+  null, empty, very short input), error cases, and anything the code treats specially.
 - Every test must pass against the code exactly as written below.
 - Reply with the complete test class in a single ```java code block. Keep every line under 100 characters.
 
@@ -45,17 +45,17 @@ Request from the developer: {goal}
 
 Rules:
 - Keep the class name, package, and every public method signature unchanged so callers compile.
-- Reply with the complete modernized `InvoiceCalculator` in a single ```java code block. Keep every line under 100 characters.
+- Reply with the complete modernized `{cls}` in a single ```java code block. Keep every line under 100 characters.
 
 ```java
 {source}
 ```
 """
 
-REPAIR = """The characterization suite blocked your modernization: it changed behaviour that finance
-depends on. Keep the modern style, but restore the exact original behaviour so every test passes.
+REPAIR = """The characterization suite blocked your modernization: it changed behaviour that
+{stakeholder} depend on. Keep the modern style, but restore the exact original behaviour so every test passes.
 Do not change the tests. Keep the class name, package and public method signatures.
-Reply with the complete corrected `InvoiceCalculator` in a single ```java code block. Keep every line under 100 characters.
+Reply with the complete corrected `{cls}` in a single ```java code block. Keep every line under 100 characters.
 
 Failing tests:
 {failures}
